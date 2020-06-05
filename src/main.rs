@@ -2,16 +2,14 @@ extern crate encoding_rs;
 extern crate imap;
 extern crate mailparse;
 extern crate native_tls;
-extern crate termios;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
+extern crate rpassword;
 
 use clap::{App, Arg};
 use std::fs;
-use std::io;
-use std::io::Write;
 use std::path;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -46,7 +44,6 @@ fn fetch_unseen_subjects(domain: &str, pass: &str, addr: &str) -> imap::error::R
     Ok(unseen_subjects)
 }
 
-use std::os::unix::io::AsRawFd;
 
 fn process(config_path: &path::Path) -> Result<(), String> {
     let config_str = fs::read_to_string(config_path).map_err(|e| {
@@ -60,20 +57,11 @@ fn process(config_path: &path::Path) -> Result<(), String> {
         serde_json::from_str(&config_str).map_err(|e| format!("Syntax error {:?}", e))?;
     for account in accounts.accounts {
         println!("Reading unread messages from {}", account.addr);
-        let mut buf = String::new();
-        print!("password: ");
-        io::stdout().flush().unwrap();
-        let stdin_fd = io::stdin().as_raw_fd();
-        let mut term = termios::Termios::from_fd(stdin_fd).unwrap();
-        term.c_lflag &= !termios::ECHO;
-        termios::tcsetattr(stdin_fd, termios::TCSADRAIN, &term).unwrap();
-        io::stdin().read_line(&mut buf).unwrap();
-        term.c_lflag |= termios::ECHO;
-        termios::tcsetattr(stdin_fd, termios::TCSADRAIN, &term).unwrap();
-        for subject in fetch_unseen_subjects(&account.imap, buf.trim_end_matches("\n"), &account.addr)
+        let pass = rpassword::prompt_password_stdout("password: ").unwrap();
+        for subject in fetch_unseen_subjects(&account.imap, pass.trim_end_matches("\n"), &account.addr)
             .map_err(|e| format!("imap error: {:?}", e))?
         {
-            print!("\n{}", subject);
+            println!("{}", subject);
         }
     }
     Ok(())
