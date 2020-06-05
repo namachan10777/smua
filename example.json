@@ -1,0 +1,8 @@
+{
+	"accounts": [
+		{
+			"imap": "imap.nowhere.com",
+			"addr": "john.doe@nowhere.ac.jp"
+		}
+	]
+}
